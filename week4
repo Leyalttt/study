@@ -1,0 +1,226 @@
+import jieba
+import re
+import json
+from calculate_tfidf import calculate_tfidf, tf_idf_topk
+
+"""
+基于tfidf实现简单文本摘要
+"""
+
+jieba.initialize()
+
+
+# 加载文档数据（可以想象成网页数据），计算每个网页的tfidf字典
+def load_data(file_path):
+    corpus = []
+    with open(file_path, encoding="utf8") as f:
+        documents = json.loads(f.read())
+        for document in documents:
+            # 对于每个文档，检查其标题和内容是否包含换行符\n，如果不包含，则将标题和内容连接起来
+            assert "\n" not in document["title"]
+            assert "\n" not in document["content"]
+            corpus.append(document["title"] + "\n" + document["content"])
+        tf_idf_dict = calculate_tfidf(corpus)
+
+    return tf_idf_dict, corpus
+
+
+# 计算每一篇文章的摘要
+# 输入该文章的tf_idf词典，和文章内容
+# top为人为定义的选取的句子数量
+# 过滤掉一些正文太短的文章，因为正文太短在做摘要意义不大
+def generate_document_abstract(document_tf_idf, document, top=3):
+    print('document_tf_idf', document_tf_idf) # {'哈勃': 0.1773145089919276, '望远镜': 0.047518512433511725, '重新': 0.030562331283566738,
+    # 使用正则表达式 re.split("？|！|。", document) 将文档拆分为句子列表 sentences
+    sentences = re.split("？|！|。", document)
+    # print('sentences', sentences) # 一个文章里所有句子
+    # 过滤掉正文在五句以内的文章
+    if len(sentences) <= 5:
+        return None
+    result = []
+    for index, sentence in enumerate(sentences):
+        sentence_score = 0
+        # 对句子进行分词
+        words = jieba.lcut(sentence)
+        # print('words', words)  #  ['一般', '情况', '下', '为', ':', '影院', '50%', '左右',
+        for word in words:
+            # 每个词，如果它在document_tf_idf字典中存在，则将其对应的值加到sentence_score上
+            # word一个分词
+            sentence_score += document_tf_idf.get(word, 0)
+        sentence_score /= (len(words) + 1)
+        result.append([sentence_score, index])
+    result = sorted(result, key=lambda x: x[0], reverse=True)
+    # 权重最高的可能依次是第10，第6，第3句，将他们调整为出现顺序比较合理，即3,6,10
+    important_sentence_indexs = sorted([x[1] for x in result[:top]])
+    return "。".join([sentences[index] for index in important_sentence_indexs])
+
+
+# 生成所有文章的摘要
+def generate_abstract(tf_idf_dict, corpus):
+    res = []
+    for index, document_tf_idf in tf_idf_dict.items():
+        title, content = corpus[index].split("\n")
+        abstract = generate_document_abstract(document_tf_idf, content)
+        # print("abstract", abstract)  # ['编者按：今年冬季让叠穿打造你的完美身材，越穿越瘦是可能', '哪怕是不了解流行，也要对时尚又显瘦的叠穿造型吸引，现在就开始行动吧', '搭配Tips：亮红色的皮外套给人光彩夺目的感觉，内搭短版的黑色T恤，露出带有线条的腹部是关键，展现你健美的身材', ' 搭配Tips：简单款型的机车装也是百搭的单品，内搭一条长版的连衣裙打造瘦身的中性装扮', '软硬结合的mix风同样备受关注', ' 搭配Tips：贴身的黑色装最能达到瘦身的效果，即时加上白色的长外套也不会发福', '长款的靴子同样很好的修饰了你的小腿线条', ' 搭配Tips：高腰线的抹胸装很有拉长下身比例的效果，A字形的荷叶摆同时也能掩盖腰部的赘肉', '外加一件短款的羽绒服，配上贴腿的仔裤，也很修长', '']
+        if abstract is None:
+            continue
+        corpus[index] += "\n" + abstract
+        res.append({"标题": title, "正文": content, "摘要": abstract})
+    return res
+
+
+if __name__ == "__main__":
+    path = "news.json"
+    tf_idf_dict, corpus = load_data(path)
+    res = generate_abstract(tf_idf_dict, corpus)
+    # print('res', res)
+    writer = open("abstract.json", "w", encoding="utf8")
+    writer.write(json.dumps(res, ensure_ascii=False, indent=2))
+    writer.close()
+
+
+
+
+
+
+
+
+
+# coding:utf8
+import jieba
+import math
+import os
+import json
+from collections import defaultdict
+from calculate_tfidf import calculate_tfidf, tf_idf_topk
+
+"""
+基于tfidf实现文本相似度计算
+"""
+# jieba初始化
+jieba.initialize()
+
+
+# 加载文档数据（可以想象成网页数据），计算每个网页的tfidf字典
+# 之后统计每篇文档重要在前10的词，统计出重要词词表
+# 重要词词表用于后续文本向量化
+def load_data(file_path):
+    corpus = []
+    with open(file_path, encoding="utf8") as f:
+        # 从一个 JSON 文件中读取数据，并将其解析为一个 Python 对象
+        documents = json.loads(f.read())
+        for document in documents:
+            corpus.append(document["title"] + "\n" + document["content"])
+    # 计算文档的tfidf
+    tf_idf_dict = calculate_tfidf(corpus)
+    # 领域关键词
+    topk_words = tf_idf_topk(tf_idf_dict, top=5, print_word=False)
+    # topk_words是字典 键是文档的索引，值是关键词列表
+    # print('topk_words', topk_words)  # {0: [('电子竞技', 0.09798031794132472), ('叠', 0.06774752466201009), ('搭', 0.06367655193863583),
+    vocab = set()
+    # 遍历topk_words的所有values
+    # print('topk_words.values()', topk_words.values())
+    for words in topk_words.values():
+        # word, score '电子竞技', 0.09798031794132472
+        for word, score in words:
+            vocab.add(word)
+    # print("词表大小：", len(vocab))
+    # list(vocab) 将集合转为列表 vocab 是一个集合，包含了从文档中提取的重要词
+    # print('list(vocab)', list(vocab))  # ['斯图姆', '克里米亚', '象群', '详细', '篮筐'
+    return tf_idf_dict, list(vocab), corpus
+
+
+# passage是文本字符串
+# vocab是词列表
+# 向量化的方式：计算每个重要词在文档中的出现频率
+def doc_to_vec(passage, vocab):
+    # vocab 是一个集合，包含了从文档中提取的重要词, passage 包含了title和content的文本
+    # 初始化一个长度为词汇表长度的向量，所有元素都为0
+    vector = [0] * len(vocab)
+    # print('passage', passage) # 摄影师拍摄到苍鹭捕食野兔照片（组图） 众所周之，苍鹭主要以鱼、虾为食。不过日前，
+    # print('vocab', vocab)  # ['检修', '大地', '吗', '英菲尼迪', '运营', '表演队',...
+    # 对title和content进行分词
+    passage_words = jieba.lcut(passage)
+    # print('passage_words', passage_words)  # ['网上', '出租', '爱车', '被', '骗', ' ', '两'...]
+    for index, word in enumerate(vocab):
+        # 计算词频 该词在 passage_words 分词列表中的出现次数除以 passage_words 分词
+        # 的总长度
+        vector[index] = passage_words.count(word) / len(passage_words)
+    # print('vector', vector)  #  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,。。。]
+    return vector
+
+
+# 先计算所有文档的向量, 文档中每个分词的词频
+def calculate_corpus_vectors(corpus, vocab):
+    # corpus 包含了所有的title和content的文本
+    # vocab 是一个集合，包含了从文档中提取的重要词
+    # print('vocab', vocab)  # ['斯图姆', '克里米亚', '象群', '详细', '篮筐', '宝马',...
+    corpus_vectors = [doc_to_vec(c, vocab) for c in corpus]
+    return corpus_vectors
+
+
+# 计算向量余弦相似度
+def cosine_similarity(vector1, vector2):
+    # vector1输入的词频， vector2 文档的分词词频
+    # 计算了两个向量的点积。点积是两个向量对应元素乘积的和
+    x_dot_y = sum([x * y for x, y in zip(vector1, vector2)])
+    # 计算了两个向量的模（即向量的长度）。向量的模是向量中每个元素的平方和的平方根
+    sqrt_x = math.sqrt(sum([x ** 2 for x in vector1]))
+    sqrt_y = math.sqrt(sum([x ** 2 for x in vector2]))
+    # 如果其中一个向量的模为零，那么两个向量正交（即没有相似度）
+    if sqrt_y == 0 or sqrt_y == 0:
+        return 0
+    # 返回两个向量的余弦相似度。余弦相似度是两个向量的点积除以两个向量的范数的乘积。为了防止除以零的情况，函数在计算过程中添加了一个小的常数 1e-7
+    return x_dot_y / (sqrt_x * sqrt_y + 1e-7)
+
+
+# 输入一篇文本，寻找最相似文本
+def search_most_similar_document(passage, corpus_vectors, vocab):
+    # input_vec， 根据passage输入的分词求出的词频
+    input_vec = doc_to_vec(passage, vocab)
+    # print('len', len(input_vec)) # 1495
+    result = []
+    # 遍历文档的分词词频
+    for index, vector in enumerate(corpus_vectors):
+        # 向量余弦值
+        score = cosine_similarity(input_vec, vector)
+        result.append([index, score])
+    # 根据余弦值排序， reverse=True 表示按照降序排序，即从大到小排序
+    result = sorted(result, reverse=True, key=lambda x: x[1])
+    return result[:4]
+
+
+if __name__ == "__main__":
+    path = "news.json"
+    # vocab 是一个集合，包含了从文档中提取的重要词, corpus 包含了title和content的文本
+    tf_idf_dict, vocab, corpus = load_data(path)
+    # 文档里每个分词的词频
+    corpus_vectors = calculate_corpus_vectors(corpus, vocab)
+    # print('corpus_vectors', corpus_vectors)  # 0.0, 0.0, 0.0, 0.0, 0.0, 0.0...
+    # print('len', len(corpus_vectors))  # 360
+    passage = "魔兽争霸"
+    for corpus_index, score in search_most_similar_document(passage, corpus_vectors, vocab):
+        print("相似文章:\n", corpus[corpus_index].strip())
+        print("得分：", score)
+        print("--------------")
+#         相似文章:
+#  WGT主办方 赏两场比赛给玩家看看
+# WGT的比赛进行的如火如荼，这次比赛也是在2011年年初的首次魔兽争霸的巅峰对决，虽然不想承认，但是在WemadeFox的魔兽争霸选手逐渐转入星际争霸2之后，2011年魔兽争霸的比赛可能会少很多，所以WGT和ECL也被众多玩家所期待。然而令魔兽争霸玩家失望的是，我们不仅仅没有看到全部比赛，甚至连决赛也没有看到，更让人不解的是，SKY和Infi的比赛进行到一半时直播也被迫停止。作为主办方而言，既然选择了Dota，魔兽争霸3，和星际争霸2三个项目作为比赛项目那就表示了对这三个项目的认可，然而现在玩家看到了星际争霸2和Dota的决赛，却看不到魔兽争霸3的决赛，对于魔兽争霸玩家来说是个很大的损失。像WGT这样的多项目的比赛不在少数，WCG，IEF，ESWC，各个项目轮流直播大家已经习惯，毕竟也要考虑到每个游戏的Fans，所以第一天的安排比较合理，每个项目的直播都可以看到，第二天中魔兽争霸3的比赛没有完整的直播一场显然是不妥。从现场了解到的消息是因为第三天要去另外个场地准备Dota和颁奖典礼的直播，因此Infi和Sky的比赛被迫中断，GTV需要收拾装备去往活动地点。玩家也不必把GTV作为攻击的对象，他们也只是替人打工的，这个责任完全是WGT赛事组织方没有很好的安排。Dota比赛的时间比较长这个我们是知道的，半决赛NV和Sunny的比赛打了超过3个小时，严重的影响了整体的进度，以至于其他项目的比赛的直播不能进行，也导致了魔兽争霸决赛不能直播的结果。既然知道在5点多的时候要结束直播，那么主办方应该更加合理的安排赛制，比较合理的安排应当是Dota转播第二局，如果有第三局的话继续转播第三局，这样不管怎么样可以让Fans感受到决胜局的紧张。除了这一点，主办方整体的进度安排也比较慢，在5点多的时候才打胜者组决赛，其实Infi和Sky两个人早就在等待了，这场比赛可以早早进行，那么也赶得上最终的决赛直播。写这篇文章的目的也就是替广大魔兽争霸Fans讨个公道，魔兽争霸3从2002年到现在已经九个年头，剩下的也是铁杆Fans，不管UD怎么样弱，人族塔怎么无聊，这么多不利因素下，这些Fans也仅仅希望多看看魔兽比赛。所以希望那些选择魔兽争霸作为比赛项目的主办方们，能够再多播点魔兽比赛，从数据上来看，这个项目在中国依然还是有着最多的Fans。另外给众多主办方提个建议，其实WTV直播也是很好的解决直播冲突的办法，就像CS的HLTV一样，玩家就不会拉下每一场的比赛，既然有了这个工具，应该好好的使用，我们也愿意给主办方提供WTV的直播帮助，让大家看到更多的直播比赛。如果只是比赛结束后看看录像的话，那么电子竞技也就会失去他应该有的魅力！
+# 得分： 0.1876831891956317
+# --------------
+# 相似文章:
+#  魔兽争霸 Fly2：0华丽推倒对手进级
+# 快讯：继我们遗憾得知Sky离开WCG2009世界总决赛舞台后，中国队终于迎来首场胜利。Fly100%以2：0的比分华丽推倒对手，再进一步。让我们期待Fly100%更好的表现！
+# 得分： 0.17407749838008288
+# --------------
+# 相似文章:
+#  魔兽争霸infi继Fly后再两局两胜晋级
+# 快讯：在本场比赛中，Infi选的是人族，对手精灵族。Infi2：0轻松获胜。继Fly100%以2：0的分数推倒对手之后，我们的国家队再有一名选手晋级下一轮赛事。
+# 得分： 0.16439883595414528
+# --------------
+# 相似文章:
+#  Infi Fly会师 魔兽冠军提前属于中国
+# WCG200成都世界电子竞技全球总决赛已经接近尾声，今日将决出各项世界冠军。令中国电竞迷骄傲的是，我国选手Infi和Fly100会师魔兽争霸决赛，提前锁定冠亚军，这是中国队在WCG的第一次包揽。魔兽争霸是中国队最有希望夺冠的项目，但昨日出师不利，两届WCG总冠军Sky在16强战就爆冷被俄罗斯选手Happy击败，而另外两位天王级人物——荷兰的Grubby和韩国的Moon也在八进四的比赛中被淘汰，让人不禁感叹一个时代的终结。不过，另两位Infi和Fly100却异军突起，在两场半决赛中，Infi完胜Happy，Fly100则在主舞台力克韩国的Lyn，成功实现了决赛会师。另一个热门项目星际争霸则呈现不同局面，韩国人继续保持着垄断，两位顶尖高手Stork和Jaedong晋级决赛。而在CS项目中，中国战队wNv和TyLoo均无缘八强。
+# 得分： 0.1076762685276914
+# --------------
+
