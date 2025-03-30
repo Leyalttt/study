@@ -48,7 +48,7 @@ class Evaluator:
                 #     '办理业务',          # 索引 1
                 #     '办理相关业务',      # 索引 2
                 # ]
-        print('self.questions', len(self.questions))
+        # print('self.questions', len(self.questions))  # 1878
         return
 
     def eval(self, epoch):
@@ -56,18 +56,26 @@ class Evaluator:
         self.stats_dict = {"correct": 0, "wrong": 0}  # 清空前一轮的测试结果
         self.model.eval()
         self.knwb_to_vector()
+        # print('self.valid_data', self.valid_data) #    <torch.utils.data.dataloader.DataLoader object at 0x0000021F3A15EDB0> [['其他业务', tensor([2])], ['手机信息', tensor([2])], ['语音查话费', tensor([23])],
         for index, batch_data in enumerate(self.valid_data):
-            # [('其他业务', '手机信息', '语音查话费', '报一下我的手机费', '语音播报我的话费是多少', '查我这个手机号码的话费', '告诉我一下手机话费', '查话费使用情况', tensor([[ 2],
+            """"
+            当使用 DataLoader 加载数据时，假设 batch_size=2，DataLoader 会将两个样本合并为：
+            ("其他业务", "手机信息"),          # 字符串合并为元组
+            tensor([[2], [2]])               # 标签堆叠为张量
+            """
+            # print('batch_data', batch_data)
+            # [('其他业务', '手机信息', '语音查话费', '报一下我的手机费', '语音播报我的话费是多少'), tensor([[ 2],
             #         [ 2],
             #         [23],
-            #         [23],...
-            print('batch_data', batch_data)
+            #         [23],.....
+            # 一个batch中有多个问题, 多个label
             test_questions, labels = batch_data
             predicts = []
             for test_question in test_questions:
                 input_ids = []
+                # 遍历知识库(train)
                 for question in self.questions:
-                    # 每次加载两个文本，输出他们的拼接后编码, 判断两个句子的相似性
+                    # 每次加载两个文本，输出他们的拼接后编码, 判断两个句子的相似性, test_question是测试, question是知识库
                     input_ids.append(self.train_data.dataset.encode_sentence(test_question, question))
                 # 对 test_question="如何查询话费"，依次与知识库中的每个 question 生成句子对：
                 # ["如何查询话费", "查询话费余额"] → 输入编码 input_ids_1。
@@ -89,9 +97,11 @@ class Evaluator:
                 # .cpu() 将张量从 GPU 移回 CPU（若在 GPU 上）。
                 # 转换为列表：
                 # .tolist() 将张量转换为 Python 列表
+                # np.argmax用于返回数组 scores 中最大值的索引
                 hit_index = np.argmax(scores)
                 # print(hit_index)
                 predicts.append(hit_index)
+            # print('predicts', predicts)  # [17, 17, 141, 735, 1465, 1627, 652, 168, 167, 652, 729, 140, 245...]
             self.write_stats(predicts, labels)
         self.show_stats()
         return
@@ -99,6 +109,7 @@ class Evaluator:
     def write_stats(self, predicts, labels):
         assert len(labels) == len(predicts)
         for hit_index, label in zip(predicts, labels):
+            # question_index_to_standard_question_index中key为问题编号, value为属于哪一类
             hit_index = self.question_index_to_standard_question_index[hit_index]  # 转化成标准问编号
             if int(hit_index) == int(label):
                 self.stats_dict["correct"] += 1
