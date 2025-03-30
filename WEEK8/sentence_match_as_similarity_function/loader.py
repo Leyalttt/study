@@ -63,7 +63,7 @@ class DataGenerator:
                     # self.schema[label] label作为key, 找到对应的value(是数字)
                     label_index = torch.LongTensor([self.schema[label]])
                     self.data.append([question, label_index])
-                    # print('self.data', self.data)
+                    print('self.data', self.data)
                     # print('len(self.data)', len(self.data))  # 464
         #             [['其他业务', tensor([2])], ['手机信息', tensor([2])], ['语音查话费', tensor([23])],
         return
@@ -107,7 +107,7 @@ class DataGenerator:
         standard_question_index = list(self.knwb.keys())
         # self.knwb中的key
         # print('standard_question_index', standard_question_index)  # [2, 23, 22, 15, 12, 17, 9, 20, 10, 27, 26, 6, 3, 19, 25, 4, 5, 28, 11, 0, 18, 13, 8, 7, 16, 24, 14, 21, 1]
-        # 随机正样本
+        # 随机正样本(句子相似)
         # positive_sample_rate => 0.5
         # random.random() 生成了一个在 [0.0, 1.0) 范围内的随机浮点数
         if random.random() <= self.config["positive_sample_rate"]:
@@ -119,7 +119,7 @@ class DataGenerator:
             else:
                 # 从 standard_question_index 列表中随机选择了两个元素(就是两个问题) 并将这两个元素分别赋值给 s1 和 s2 不放回
                 s1, s2 = random.sample(self.knwb[p], 2)
-
+                # s1, s2 拼接在一起同时传给模型, s1, s2 会遇见
                 input_ids = self.encode_sentence(s1, s2)
                 # print('input_ids', input_ids)
                 # [101, 2769, 7444, 6206, 3341, 4510, 3227, 4850, 1216, 5543, 102, 5543, 679, 5543, 1215, 3341, 4510, 6413, 749, 102]
@@ -128,7 +128,7 @@ class DataGenerator:
 
                 # 例如:采样句子 ["如何办理停机保号", "停机保号流程"]，编码后标签为 1。
                 return [input_ids, torch.LongTensor([1])]
-        # 随机负样本
+        # 随机负样本(句子不相似)
         else:
             # 随机选取standard_question_index中的两个不放回
             p, n = random.sample(standard_question_index, 2)
