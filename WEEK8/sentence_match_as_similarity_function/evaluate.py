@@ -26,7 +26,18 @@ class Evaluator:
     def knwb_to_vector(self):
         self.question_index_to_standard_question_index = {}
         self.questions = []
+        """
+        1.DataGenerator类继承自Dataset(通过继承 Dataset，DataGenerator 可以直接传递给 DataLoader)：
+        DataGenerator是自定义的Dataset子类，它的__getitem__方法会返回预处理后的数据（编码后的input_ids和labels）。同时这个类在self.sentences属性中存储
+        了原始句子列表。
 
+        2.DataLoader的创建：
+        当通过DataLoader(dg, ...)创建DataLoader对象时，dg这个DataGenerator实例会被保存在DataLoader.dataset属性中。
+
+        3.访问原始数据：
+        因此，当你有self.valid_data（这是一个DataLoader对象）时，可以通过self.valid_data.dataset直接访问原始的DataGenerator实例。而DataGenerator中保存了所有原始句子
+        的self.sentences列表，所以可以通过self.valid_data.dataset.sentences获取全部句子。
+        """
         # self.train_data.dataset获取的是 DataLoader 使用的自定义 Dataset 实例（假设为 DataGenerator 类）
         # knwb => defaultdict(<class 'list'>, {2: ['问一下我的电话号', '办理业务', '办理相关业务',....], 14: ['改下畅聊套餐'],...}
         # standard_question_index =>schema 答案集target对应的索引
