@@ -1,0 +1,101 @@
+10.4.9 为什么BERT在第一句前会加一个[CLS]标志? BERT输出的两个函数是什么？​
+•
+BERT在第一句前会加一个[CLS]标志，最后一层该位置对应的向量可以作为整句话的语义表示，从而用于下游的分类任务等。与文本中已有的其它词相比，这个无明显语义信息的符号会更“公平”地融合文本中各个词的语义信息，从而更好的表示整句话的语义。具体来说，self-attention是用文本中的其它词来增强目标词的语义表示，但是目标词本身的语义还是会占主要部分的，因此，经过BERT的12层，每次词的embedding融合了所有词的信息，可以去更好的表示自己的语义。而[CLS]位本身没有语义，经过12层，得到的是attention后所有词的加权平均，相比其他正常词，可以更好的表征句子语义。当然，也可以通过对最后一层所有词的embedding做pooling表征句子语义​
+•
+在BERT TF源码中有两种输出​
+◦
+get_pooled_out()，就是上述[CLS]的表示，输出shape是[batch size,hidden size]​
+◦
+get_sequence_out()，获取的是整个句子每一个token的向量表示，输出shape是[batch_size, seq_length, hidden_size]，这里也包括[CLS]对应的向量
+
+模型。​
+10.4.44 大模型的困惑度（PPL）是什么？​
+困惑度（Perplexity, PPL）用于衡量语言模型的好坏。模型 Model 在预训练测试集数据 
+​
+T={w1,w2,…,w N}
+上的困惑度越低，说明模型对下一个单词的预测越准确，模型性能越好，生成文本的流畅性和一致性越高：​
+                     
+Perplexity(Model)=exp(− 
+N
+1
+​
+  
+i=1
+∑
+N
+​
+ logP(w 
+i
+​
+ ∣w 
+1
+​
+ ,…,w 
+i−1
+​
+ ))
+​
+其中
+​
+N
+是测试数据的 token 总数， 
+​
+P(w 
+i
+​
+ ∣w 
+1
+​
+ ,⋯,w 
+i−1
+​
+ )
+是模型对第
+​
+i
+个 token 的预测概率  ​
+可以看到上述公式括号中的式子实际上就是预训练使用的交叉熵 Loss，所以 PPL 的计算也可以写成下式：​
+​
+PPL(Model)=exp(L)
+​
+利用transformers库简单计算逻辑如下，更详细的代码见：https://huggingface.co/docs/transformers/perplexity​
+​
+​ ​
+代码块​
+￼
+Python
+from transformers import AutoModelForCausalLM, AutoTokenizer​
+import torch​
+model = AutoModelForCausalLM.from_pretrained("gpt2")​
+tokenizer = AutoTokenizer.from_pretrained("gpt2")​
+text = "I am RZ, a LLMer and a RLer."​
+inputs = tokenizer(text, return_tensors="pt")​
+with torch.no_grad():​
+    outputs = model(**inputs, labels=inputs["input_ids"])​
+    loss = outputs.loss​
+    ppl = torch.exp(loss).item()​
+print(f"Perplexity: {ppl}")
+
+对于长文本来说则需要进行分块处理：​
+​
+​ ​
+代码块​
+￼
+Python
+max_length = model.config.n_positions​
+stride = 512  # 滑动窗口步长​
+total_loss = 0​
+total_count = 0​
+for i in range(0, len(input_ids), stride):​
+    chunk = input_ids[:, i:i+max_length]​
+    with torch.no_grad():​
+        outputs = model(chunk, labels=chunk)​
+    loss = outputs.loss​
+    total_loss += loss.item() * chunk.size(1)​
+    total_count += chunk.size(1)​
+ppl = torch.exp(total_loss / total_count).item()​
+​ ​
+​
+在训练过程中监控验证集的PPL变化，可动态调整学习率或提前终止训练，也可以监控预训练多任务、多领域数据的训练情况（比如从每个数据集随机抽样出200个左右的样本，作为PPL监控的样本）。但是PPL指标依赖测试数据的分布，若数据与训练集差异大，PPL可能失真。而且全局平均值可能掩盖局部生成错误（如逻辑矛盾）。​
+PPL与BLEU、ROUGE的区别？​
+PPL基于概率评估，BLEU/ROUGE基于n-gram重叠率。PPL 反映模型内部置信度，其他两个衡量的是生成文本与参考文本的相似度
