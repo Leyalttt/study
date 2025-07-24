@@ -309,7 +309,25 @@ Python中对象的赋值都是进行对象引用（内存地址）传递。​
 ​
 ​ ​
 代码块​
-￼
+￼import copy​
+a = [1, 2, 3, 4, ['a', 'b']]​
+b = a #赋值，传对象的引用​
+c = copy.copy(a) #浅拷贝，对象拷贝​
+d = copy.deepcopy(a) #深拷贝，对象拷贝​
+ ​
+a.append(5) #修改对象a,列表末尾添加数字5​
+a[4].append('c') #修改对象a中的列表['a', 'b']​
+ ​
+print 'a= ', a​
+print 'b= ', b​
+print 'c= ', c​
+print 'd= ', d​
+ ​
+输出结果：​
+a = [1, 2, 3, 4, ['a', 'b', 'c'], 5] #修改了原始对象，变为修改后的列表​
+b = [1, 2, 3, 4, ['a', 'b', 'c'], 5] #对象的引用，对象的任何值变化都随着变化​
+c = [1, 2, 3, 4, ['a', 'b', 'c']] #浅拷贝，不可变元素不能改变，可变元素随着原始对的变化而变化了​
+d = [1, 2, 3, 4, ['a', 'b']] #深
 ​ ​
 ​
 7.
@@ -360,7 +378,11 @@ python类变量和实例变量​
 ​
 ​ ​
 代码块​
-￼
+￼{key_expr: value_expr for item in iterable if condition}​
+keys = ['a', 'b', 'c']​
+values = [1, 2, 3]​
+dictionary = {k: v for k, v in zip(keys, values)}​
+print(dictionary)  # 输出：{'a': 1, 'b': 2, 'c': 3}
 ​ ​
 ​
 13.
@@ -445,7 +467,14 @@ pop：​
 ​ ​
 代码块​
 ￼
-​ ​
+​ ​my_list = [1, 2, 3, 4]​
+# 获取迭代器对象​
+my_iterator = iter(my_list)​
+# 使用迭代器逐个访问元素​
+print(next(my_iterator))  # 输出：1​
+print(next(my_iterator))  # 输出：2​
+print(next(my_iterator))  # 输出：3​
+print(next(my_iterator))  # 输出：4
 ​
 24.
 字符串、列表、元组、字典每个最常用的五个方法？​
