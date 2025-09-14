@@ -128,6 +128,10 @@ plt.subplot(1, 3, 1)
 # 数值越大，点越大
 # 默认值通常是20，这里设置为50使点更加明显
 plt.scatter(X[:, 0], X[:, 1], s=50)
+
+# 设置中文字体
+plt.rcParams['font.sans-serif'] = ['SimHei']  # 'SimHei'是黑体
+plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
 plt.title("原始数据")
 
 # 使用我们的K-Means算法聚类
@@ -137,12 +141,15 @@ kmeans.fit(X)
 # 获取聚类结果
 labels = kmeans.predict(X)
 centroids = kmeans.centroids
+# print('labels', labels)  #labels [2 0 2 1 1 1 0 2 1 2 0 0 0 2...]
 
 # 可视化聚类结果
 plt.subplot(1, 3, 2)
-# cmap='viridis'：颜色映射（colormap），用于将数字标签转换为颜色,
+# c=labels 是一个关键参数，它指定每个点的颜色
+# cmap='viridis'：颜色映射（colormap），用于将数字标签转换为颜色
 plt.scatter(X[:, 0], X[:, 1], c=labels, s=50, cmap='viridis')
 # c=labels：点的颜色，根据每个数据点的簇标签决定
+# marker='X' 设置点的标记样式：
 plt.scatter(centroids[:, 0], centroids[:, 1], c='red', s=200, alpha=0.75, marker='X')
 plt.title("我们的K-Means结果")
 plt.show()
