@@ -2,11 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.datasets import make_blobs
 
+
 class KMeans:
     # k: 聚类数量，默认为3(分成3份), max_iters: 最大迭代次数，默认为100, tol: 收敛阈值，默认为1e-4(表示0.0001。)
     # max_iters K-Means算法通过迭代优化质心的位置，每次迭代都会重新分配点到簇并更新质心, 设置这个参数是为了防止算法在特殊情况下无限循环。
     # tol 在K-Means算法中，每次迭代后质心的位置会发生变化。当质心位置的变化小于这个容差时，我们认为算法已经收敛，可以停止迭代。
-    def __init__(self, k=3, max_iters = 100, tol = 1e-4):
+    def __init__(self, k=3, max_iters=100, tol=1e-4):
         self.k = k
         self.max_iters = max_iters
         self.tol = tol
@@ -21,7 +22,7 @@ class KMeans:
         # print('X.shape', X.shape)  # X.shape (300, 2) 每个数据有两个特征
         # print('indices', indices)  # [ 85 267 226] 从0-299取三个不重复的数据
 
-        centroids = X[indices]  # 三个质心的值
+        centroids = X[indices]  # 三个质心的值, np.array格式
         # print('centroids', centroids)
         # [[ 3.66800921  0.15565258]
         #  [-2.66974818  1.82044485]
@@ -53,7 +54,7 @@ class KMeans:
                 clusters[closest_cluster].append(features)  # 二维数组
 
             # 步骤2: 计算新的质心, 在所有点分配完成后，即在内层循环外）
-            new_centroids = []
+            new_centroids = []  # 普通list
             # 遍历每个簇, cluster是当前簇的所有数据点列表
             for cluster in clusters:
                 if cluster:  # 非空簇
@@ -65,9 +66,8 @@ class KMeans:
                 else:  # 空簇，随机重新初始化
                     # 如果当前簇为空（没有数据点被分配到该簇），则随机选择一个数据点作为新的质心
                     # 这是一种处理空簇的策略，确保算法能够继续运行
+                    # np.random.choice(X.shape[0]) 只是下标
                     new_centroids.append(X[np.random.choice(X.shape[0])])
-            # 将新质心列表转换为NumPy数组
-            # 这样可以方便后续的数学运算和比较
 
             # 步骤3: 检查质心是否变化（在所有点分配完成后）
             # 检查新旧质心是否足够接近，如果是，则算法已收敛，跳出循环
@@ -82,9 +82,14 @@ class KMeans:
             # 将质心和簇保存为实例变量，以便在其他方法（如predict）中使用
             # self.centroids存储最终的质心位置
             # self.clusters存储每个簇包含的数据点
+            # 将新质心列表转换为NumPy数组, 初始定义就是np.array
+            # 这样可以方便后续的数学运算和比较
             centroids = np.array(new_centroids)
-            self.centroids = np.array(centroids)
+            # print(type(new_centroids))  # <class 'list'>
+            # print(type(centroids))  # <class 'numpy.ndarray'>
+            self.centroids = centroids
             self.clusters = clusters
+
     # 预测
     def predict(self, X):
         # 为每个数据点找到最近的质心，返回其所属簇的索引
@@ -93,13 +98,17 @@ class KMeans:
         # print('y_pred', y_pred)  # y_pred [0, 1, 0, 2, 2, 2, 1, 0, 2, 0, 1, 1, 1...]
         return np.array(y_pred)
 
+
 # 生成一些示例数据
 # make_blobs函数从sklearn.datasets模块生成合成的聚类数据集
-# n_samples指定生成的数据点总数, centers指定要生成的中心点（簇）的数量, cluster_std定每个簇的标准差, random_state = 0 这个参数确保每次运行代码时生成的数据集是相同的
+# make_blobs(n_samples=100, n_features=2, centers=None, cluster_std=1.0, center_box=(-10.0, 10.0),shuffle=True, random_state=None)
+# n_samples指定生成的数据点总数, n_features：默认值= 2,每个样本的特征数量。centers指定要生成的中心点（簇）的数量, cluster_std定每个簇的标准差, random_state = 0 这个参数确保每次运行代码时生成的数据集是相同的
 #  X 类型：NumPy数组，形状为(n_samples, n_features) (300, 2)
 # y_true 类型：NumPy数组，形状为(n_samples,) 含义：每个数据点所属的真实簇标签
 X, y_true = make_blobs(n_samples=300, centers=3, cluster_std=0.70, random_state=0)
 # print('X', X)  # [[ 0.33729452  5.08569873] [ 1.54734936 -0.07069111] [ 1.50899649  4.38895984]...]
+# print(X.shape)  # (300, 2)
+# print(y_true.shape)  # (300,)
 # print('y_true', y_true)  #  [0 1 0 2 2 2 1 0 2 2 1 1 ...]
 
 # 可视化原始数据
