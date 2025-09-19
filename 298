@@ -993,4 +993,21 @@ print(df['Name'])​
 print(df[df['Age'] > 30])​
 ​ ​
 ​
+ RNN、CNN和Transformer三大NLP特征提取器对比
+
+RNN:采用线性序列结构不断从前往后收集输入信息，但这种线性序列结构在反向传播的时候存在优化困难问题，因为反向传播路径太长，容易导致严重的梯度消失或梯度爆炸问题.。RNN结构（LSTM，GRU）结构存在序列依赖，对大规模并行非常不友好
+
+CNN：卷积层其实是保留了相对位置信息的，并行能力比较强
+
+RNN，CNN，Transformer对比：
+
+语义特征提取能力：Transformer在这方面的能力非常显著地超过RNN和CNN，RNN和CNN两者能力差不太多
+
+长距离特征捕获能力:：原生CNN特征抽取器在这方面极为显著地弱于RNN和Transformer，Transformer微弱优于RNN模型(尤其在主语谓语距离小于13时)，能力由强到弱排序为Transformer>RNN>>CNN; 但在比较远的距离上（主语谓语距离大于13），RNN微弱优于Transformer，所以综合看，可以认为Transformer和RNN在这方面能力差不太多，而CNN则显著弱于前两者
+
+任务综合特征抽取能力: （机器翻译）：Transformer综合能力要明显强于RNN和CNN，而RNN和CNN看上去表现基本相当，貌似CNN表现略好一些
+
+并行计算能力及运行效率:：RNN在并行计算方面有严重缺陷，这是它本身的序列依赖特性导致的；对于CNN和Transformer来说，因为它们不存在网络中间状态不同时间步输入的依赖关系，所以可以非常方便及自由地做并行计算改造。Transformer和CNN差不多，都远远远远强于RNN
+
+**单从任务综合效果方面来说，Transformer明显优于CNN，CNN略微优于RNN。速度方面Transformer和CNN明显占优，RNN在这方面劣势非常明显**
 ​
