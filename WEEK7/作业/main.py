@@ -51,7 +51,7 @@ def main(config):
     model = TorchModel(config)
     # 标识是否使用gpu
     cuda_flag = torch.cuda.is_available()
-    print('cuda_flag', cuda_flag)
+    # print('cuda_flag', cuda_flag)
     if cuda_flag:
         logger.info("gpu可以使用，迁移模型至gpu")
         model = model.cuda()
@@ -78,6 +78,7 @@ def main(config):
             optimizer.zero_grad()
             input_ids, labels = batch_data  # 输入变化时这里需要修改，比如多输入，多输出的情况
             # print('input_ids', input_ids.shape)  # torch.Size([12, 30])
+            # print('labels', labels.shape)  # torch.Size([12, 1])
             # print('labels', labels) # tensor([[0],[1],[0],[0],[0],[0],[0],[1],[0],[0],[1],[0]])  12个
             #               x         y
             loss = model(input_ids, labels)
