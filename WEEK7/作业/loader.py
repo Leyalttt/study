@@ -9,21 +9,6 @@ from torch.utils.data import Dataset, DataLoader
 from transformers import BertTokenizer
 """
 数据加载
-
-训练集测试集
-1,第一次订，提前送到，吃了下才来评价，味道不错，好评
-0,鸡肉的有点淡
-1,虽然送了3个多小时，但是态度很好，反正我也不急着吃
-0,"不,好,吃,！"
-0,"土豆肉丝,没见肉在哪"
-1,看着不错，饭量也还可以。
-0,超级难吃，速度和包装倒是不错，不知卷饼怎么做成这样
-0,之前送的很快，今天不知道为什么特别慢，送餐的还不认识路，就在他家馆子门口……
-0,态度非常好，送晚了主动送了两瓶王老吉
-0,菜煮烂了，鸡肉很多都是骨头
-0,送餐时间超慢
-0,送餐太慢，米饭还得另加2元
-1,很好吃，很快
 """
 
 
@@ -66,6 +51,8 @@ class DataGenerator:
                     # tokenizer.encode 方法的返回值是一个列表，包含了输入 ID 和注意力掩码。输入 ID 是一个整数列表，每个整数代表一个单词或子词的 ID。
                     # 注意力掩码是一个布尔列表，用于指示哪些位置是填充的，哪些位置是有效的
                     input_id = self.tokenizer.encode(title, max_length=self.config["max_length"], pad_to_max_length=True)
+                    # input_id是个列表没有shape
+                    print('input_id', input_id)  # [101, 107, 125, 702, 7164, 1928, 117, 1920, 2157, 5632, 2346, 2682, 2682, 1416, 117, 6821, 3416, 4638, 2421, 107, 102, 0, 0, 0, 0, 0, 0, 0, 0, 0]
                 else:
                     input_id = self.encode_sentence(title)
                 # 一句话转成id, 不够config里面设置的最大长度30用0补充
