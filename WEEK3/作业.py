@@ -14,6 +14,8 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 输入一个字符串，根据字符a所在位置进行分类
 对比rnn和pooling做法
 
+判断是否含有a就是二分类
+
 """
 
 class TorchModel(nn.Module):
