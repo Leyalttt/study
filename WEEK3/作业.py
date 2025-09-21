@@ -23,7 +23,9 @@ class TorchModel(nn.Module):
         # pool会失去语序信息就不能得到它的位置
         # self.pool = nn.AvgPool1d(sentence_length)   #池化层
         # 可以自行尝试切换使用rnn
-        # vector_dim输入特征和vector_dim隐藏状态的维度相同, 40*10*30 batch_size(每次训练样本个数) * sentence_length(文本长度) * char_dim(每个字的维度)
+        # vector_dim输入特征和vector_dim隐藏状态的维度, 40*10*30 batch_size(每次训练样本个数) * sentence_length(文本长度) * char_dim(每个字的维度)
+        # 如果 batch_first=False（默认），输入形状为 (sequence_length, batch_size, input_size)
+        # batch_first=True：指定输入数据的形状为 (batch_size, sequence_length, input_size)
         self.rnn = nn.RNN(vector_dim, vector_dim, batch_first=True)
 
         # +1的原因是可能出现a不存在的情况，那时的真实label在构造数据时设为了sentence_length
@@ -33,8 +35,13 @@ class TorchModel(nn.Module):
 
     # 当输入真实标签，返回loss值；无真实标签，返回预测值, x是输入的向量
     def forward(self, x, y=None):
+        # print(x.shape)  # 训练torch.Size([40, 10]), 测试torch.Size([200, 10]), 预测torch.Size([4, 10])
         x = self.embedding(x)
-        # 使用rnn的情况 每个字rnn_out RNN 在处理输入序列后的输出(预测结果/结果分类), 最终的隐藏状态hidden(包含了在每个时间步的隐藏状态)
+        # print(x.shape)  # 训练torch.Size([40, 10, 30]), 测试torch.Size([200, 10, 30]), 预测torch.Size([4, 10, 30])
+
+
+        # nn.RNN 的返回值是一个元组 (output, hidden)
+        # 使用rnn的情况 rnn_out 每个时间步的隐藏状态(预测结果/结果分类), 最后一个时间步的隐藏状态hidden(包含了在每个时间步的隐藏状态)
         # batch_first为false的形状 sentence_length(文本长度) * batch_size(每次训练样本个数)  * char_dim(每个字的维度)
         # batch_first为true的形状  batch_size(每次训练样本个数) * sentence_length(文本长度) * char_dim(每个字的维度)
         rnn_out, hidden = self.rnn(x)
@@ -47,7 +54,7 @@ class TorchModel(nn.Module):
         # print('x', x.shape)  # 40*30 batch_size * char_dim(每个字的维度)
         # 接线性层做分类
         y_pred = self.classify(x)
-        """40*11"""
+        """训练40*11 测试200*11 预测: 4* 11"""
         # print('y_pred', y_pred.shape)
         if y is not None:
             return self.loss(y_pred, y)   # 预测值和真实值计算损失
@@ -76,6 +83,8 @@ def build_sample(vocab, sentence_length):
     #  vocab 词汇表中keys随机选择 sentence_length 个不重复的key，并返回这些单词的列表
     # print('list(vocab.keys()', list(vocab.keys()))  # ['pad', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'unk']
     x = random.sample(list(vocab.keys()), sentence_length)
+    # print(x)  # 比如:['c', 'j', 'unk', 'b', 'i', 'g', 'pad', 'k', 'h', 'e']
+
     # 指定哪些字出现时为正样本
     # 字符串x中是否包含字符"a"。如果x中包含字符"a"，那么y将被赋值为"a"在x中的索引
     if "a" in x:
@@ -83,17 +92,17 @@ def build_sample(vocab, sentence_length):
     else:
         y = sentence_length  # 每次都是选择sentence_length(样本长度)个所以y没找到就是sentence_length最大长度 (10)
     x = [vocab.get(word, vocab['unk']) for word in x]   # 将字转换成序号，为了做embedding, 字母汉字embedding也看不懂
-    # print('x, y', x, y)  # x, y [5, 0, 4, 12, 7, 2, 9, 3, 11, 6] 10  y为10代表随机取得数没有a
+    # print('x, y', x, y)  # [5, 0, 4, 12, 7, 2, 9, 3, 11, 6] 10  y为10代表随机取得数没有a
     return x, y
 
 
 # 建立数据集
 # 输入需要的样本数量。需要多少生成多少
 # sample_length 样本训练个数， sentence_length文本长度
-def build_dataset(sample_length, vocab, sentence_length):
+def build_dataset(batch_size, vocab, sentence_length):
     dataset_x = []
     dataset_y = []
-    for i in range(sample_length):
+    for i in range(batch_size):
         # 一个样本
         x, y = build_sample(vocab, sentence_length)
         dataset_x.append(x)
@@ -178,7 +187,7 @@ def main():
     plt.plot(range(len(log)), [l[0] for l in log], label="acc")  # 画acc曲线
     plt.plot(range(len(log)), [l[1] for l in log], label="loss")  # 画loss曲线
     plt.legend()
-    plt.show()
+    # plt.show()
     # 保存模型到"model.pth"中
     # model.state_dict()`返回的是一个有序字典OrderedDict，**该有序字典中保存了模型所有参数的参数名和具体的参数值，
     # 所有参数包括可学习参数和不可学习参数，可通过循环迭代打印参数**, 因此，该方法可用于保存模型，当保存模型时，
