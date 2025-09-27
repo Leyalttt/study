@@ -1,0 +1,14 @@
+{
+  //保含
+  // "include": [
+  //   "./dev/**/*"
+  // ],
+  //不包含
+  // "exclude": [
+  //   "./dev/**/*"
+  // ],
+  //继承
+  "extends": "./config/base",
+  //文件
+  "files": ["./pro/demo"]
+}

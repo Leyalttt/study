@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "target": "ES6",
+    "module": "ES6",
+    //指定编译后的文件所在目录
+    // "outDir": "./dist"
+
+    //是否对js文件进行编译
+    "allowJs": false,
+  }
+}

@@ -1,0 +1,6 @@
+ {
+  "compilerOptions": {
+    // 取消校验
+    "strictNullChecks": false
+  }
+ }
